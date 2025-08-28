@@ -1,34 +1,54 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
 from typing import List
-from fastapi import APIRouter, Depends, Query
-from sqlmodel import Session
-
-from ..database import get_session
-from ..services.movie_service import MovieService
-from ..schemas import MovieCreate, MovieUpdate, MovieRead
+from app.database import get_session
+from app.models import Movie
+from app.schemas import MovieCreate, MovieRead, MovieUpdate
 
 router = APIRouter(prefix="/movies", tags=["Movies"])
 
-@router.get("", response_model=List[MovieRead], summary="List all movies with pagination")
-def list_movies(
-    offset: int = Query(0, ge=0, description="Number of items to skip"),
-    limit: int = Query(50, ge=1, le=200, description="Max items to return"),
-    session: Session = Depends(get_session),
-):
-    return MovieService(session).list_movies(offset=offset, limit=limit)
+# Create movie
+@router.post("/", response_model=MovieRead, status_code=201, summary="Create Movie")
+def create_movie(movie: MovieCreate, session: Session = Depends(get_session)):
+    db_movie = Movie(**movie.dict())
+    session.add(db_movie)
+    session.commit()
+    session.refresh(db_movie)
+    return db_movie
 
-@router.get("/{movie_id}", response_model=MovieRead, summary="Get a movie by ID")
-def get_movie(movie_id: str, session: Session = Depends(get_session)):
-    return MovieService(session).get_movie(movie_id)
+# List movies
+@router.get("/", response_model=List[MovieRead], summary="List Movies")
+def list_movies(offset: int = 0, limit: int = 10, session: Session = Depends(get_session)):
+    movies = session.exec(select(Movie).offset(offset).limit(limit)).all()
+    return movies
 
-@router.post("", response_model=MovieRead, status_code=201, summary="Create a new movie")
-def create_movie(payload: MovieCreate, session: Session = Depends(get_session)):
-    return MovieService(session).create_movie(payload)
+# Get single movie
+@router.get("/{movie_id}", response_model=MovieRead, summary="Get Movie")
+def get_movie(movie_id: int, session: Session = Depends(get_session)):
+    movie = session.get(Movie, movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    return movie
 
-@router.put("/{movie_id}", response_model=MovieRead, summary="Update an existing movie")
-def update_movie(movie_id: str, payload: MovieUpdate, session: Session = Depends(get_session)):
-    return MovieService(session).update_movie(movie_id, payload)
+# Update movie
+@router.put("/{movie_id}", response_model=MovieRead, summary="Update Movie")
+def update_movie(movie_id: int, data: MovieUpdate, session: Session = Depends(get_session)):
+    movie = session.get(Movie, movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    for key, value in data.dict(exclude_unset=True).items():
+        setattr(movie, key, value)
+    session.add(movie)
+    session.commit()
+    session.refresh(movie)
+    return movie
 
-@router.delete("/{movie_id}", status_code=204, summary="Delete a movie by ID")
-def delete_movie(movie_id: str, session: Session = Depends(get_session)):
-    MovieService(session).delete_movie(movie_id)
+# Delete movie
+@router.delete("/{movie_id}", status_code=204, summary="Delete Movie")
+def delete_movie(movie_id: int, session: Session = Depends(get_session)):
+    movie = session.get(Movie, movie_id)
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+    session.delete(movie)
+    session.commit()
     return None
