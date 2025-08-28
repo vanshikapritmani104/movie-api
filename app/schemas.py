@@ -1,24 +1,21 @@
 from typing import Optional
 from sqlmodel import SQLModel
-
 class MovieCreate(SQLModel):
     title: str
     director: str
-    release_year: int   # changed from releaseYear
+    release_year: int   
     genre: str
     rating: float
-
 class MovieUpdate(SQLModel):
     title: Optional[str] = None
     director: Optional[str] = None
-    release_year: Optional[int] = None   # changed
+    release_year: Optional[int] = None   
     genre: Optional[str] = None
     rating: Optional[float] = None
-
 class MovieRead(SQLModel):
     id: int
     title: str
     director: str
-    release_year: int   # changed
+    release_year: int   
     genre: str
     rating: float
